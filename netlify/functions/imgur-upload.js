@@ -1,13 +1,12 @@
 // Netlify Function for uploading images to Imgur
-// This replaces the Express proxy server for production deployment
+// Uses built-in fetch API (available in Netlify Functions runtime)
 
-import fetch from 'node-fetch';
-
-export async function handler(event, context) {
+export const handler = async (event, context) => {
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return {
             statusCode: 405,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ error: 'Method not allowed' })
         };
     }
@@ -18,6 +17,7 @@ export async function handler(event, context) {
         if (!base64Data) {
             return {
                 statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ error: 'No image provided' })
             };
         }
@@ -27,6 +27,7 @@ export async function handler(event, context) {
         if (!base64Image) {
             return {
                 statusCode: 400,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ error: 'Invalid base64 data' })
             };
         }
@@ -34,25 +35,23 @@ export async function handler(event, context) {
         // Get Imgur Client ID from environment variable
         const IMGUR_CLIENT_ID = process.env.IMGUR_CLIENT_ID || '1598cfe786e48f0';
 
-        // Create form data for Imgur API
-        const formData = new URLSearchParams();
-        formData.append('image', base64Image);
-
-        // Upload to Imgur
+        // Upload to Imgur using built-in fetch
         const response = await fetch('https://api.imgur.com/3/image', {
             method: 'POST',
             headers: {
                 'Authorization': `Client-ID ${IMGUR_CLIENT_ID}`,
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: formData
+            body: `image=${encodeURIComponent(base64Image)}`
         });
 
         const data = await response.json();
 
         if (!response.ok) {
+            console.error('Imgur API error:', response.status, data);
             return {
                 statusCode: response.status,
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             };
         }
@@ -71,10 +70,12 @@ export async function handler(event, context) {
         console.error('Imgur upload error:', error);
         return {
             statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 error: 'Imgur upload failed',
-                detail: error.message
+                detail: error.message,
+                stack: error.stack
             })
         };
     }
-}
+};
